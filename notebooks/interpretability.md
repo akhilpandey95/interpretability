@@ -632,6 +632,59 @@ model.fit(X_train, \
 
 
 
+#### 3.6 Evaluation metrics for the model
+
+
+```python
+# obtain the training metrics
+evaluation = model.evaluate(X_train, \
+                            {"Label-Activation": Y_train,\
+                             "Concept-Activation": Y_train_concepts})
+
+# print training metrics
+print('Label-Activation Training Loss:', evaluation[1])
+print('Label-Activation Training Accuracy:', evaluation[3])
+print('Concept-Activation Training Loss:', evaluation[2])
+print('Concept-Activation Training Accuracy:', evaluation[4])
+
+print("\n\n")
+
+# obtain the validation metrics
+evaluation = model.evaluate(X_test, \
+                            {"Label-Activation": Y_test,\
+                             "Concept-Activation": Y_test_concepts})
+
+# print validation metrics
+print('Label-Activation Validation Loss:', evaluation[1])
+print('Label-Activation Validation Accuracy:', evaluation[3])
+print('Concept-Activation Validation Loss:', evaluation[2])
+print('Concept-Activation Validation Accuracy:', evaluation[4])
+```
+
+    120000/120000 [==============================] - 20s 164us/sample - loss: 0.5841 - Label-Activation_loss: 0.1543 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9408 - Concept-Activation_accuracy: 0.9042
+    Label-Activation Training Loss: 0.15431628
+    Label-Activation Training Accuracy: 0.940775
+    Concept-Activation Training Loss: 0.42981505
+    Concept-Activation Training Accuracy: 0.90415
+    
+    
+    
+    80100/80100 [==============================] - 13s 168us/sample - loss: 0.5331 - Label-Activation_loss: 0.1556 - Concept-Activation_loss: 0.3802 - Label-Activation_accuracy: 0.9406 - Concept-Activation_accuracy: 0.9047
+    Label-Activation Validation Loss: 0.15559322
+    Label-Activation Validation Accuracy: 0.94058675
+    Concept-Activation Validation Loss: 0.38018224
+    Concept-Activation Validation Accuracy: 0.9046567
+
+
+#### 3.7 Save the model
+
+
+```python
+model.save('conceptNet-dataset1.h5')
+```
+
+#### 3.8 Visualize the label activation loss for the model
+
 
 ```python
 sns.set_style('white')
@@ -650,8 +703,10 @@ plt.show()
 ```
 
 
-![png](output_32_0.png)
+![png](output_37_0.png)
 
+
+#### 3.9 Visualize the concept activation loss for the model
 
 
 ```python
@@ -671,8 +726,10 @@ plt.show()
 ```
 
 
-![png](output_33_0.png)
+![png](output_39_0.png)
 
+
+#### 3.10 Visualize the label activation accuracy of the model
 
 
 ```python
@@ -692,8 +749,10 @@ plt.show()
 ```
 
 
-![png](output_34_0.png)
+![png](output_41_0.png)
 
+
+#### 3.11 Visualize the concept activation accuracy of the model
 
 
 ```python
@@ -710,13 +769,4 @@ plt.ylabel('Accuracy')
 plt.xlabel('Epoch')
 plt.legend(['Train', 'Validation'], loc='upper right')
 plt.show()
-```
-
-
-![png](output_35_0.png)
-
-
-
-```python
-
 ```
