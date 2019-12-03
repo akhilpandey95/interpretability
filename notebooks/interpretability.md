@@ -11,6 +11,7 @@
 # https://github.com/akhilpandey95/interpretability/blob/master/LICENSE.
 
 import os
+import pickle
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -184,8 +185,8 @@ def prepare_data(train_dir, validation_dir, batch_size, img_height, img_width):
 
 ```python
 dir_data      = "./img_align_celeba/"
-Ntrain        = 140000 
-Ntest         = 60100
+Ntrain        = 120000 
+Ntest         = 80100
 nm_imgs       = np.sort(os.listdir(dir_data))
 ## name of the jpg files for training set
 nm_imgs_train = nm_imgs[:Ntrain]
@@ -204,13 +205,21 @@ def get_npdata(nm_imgs_train):
     return(X_train)
 
 X_train = get_npdata(nm_imgs_train)
-print("X_train.shape = {}".format(X_train.shape))
-
 X_test  = get_npdata(nm_imgs_test)
+
+print("X_train.shape = {}".format(X_train.shape))
 print("X_test.shape = {}".format(X_test.shape))
 ```
 
-##### 2.2.3 Prepare the output labels
+    100%|██████████| 120000/120000 [01:57<00:00, 1024.29it/s]
+    100%|██████████| 80100/80100 [01:10<00:00, 1129.61it/s]
+
+
+    X_train.shape = (120000, 32, 32, 3)
+    X_test.shape = (80100, 32, 32, 3)
+
+
+##### 2.2.3 Prepare the output labels for the gender
 
 
 ```python
@@ -231,6 +240,70 @@ Y_test = np.array(list(map(lambda x: \
 Y_test = Y_test.reshape(-1, 1)
 ```
 
+    100%|██████████| 120000/120000 [20:33<00:00, 97.28it/s] 
+    100%|██████████| 80100/80100 [13:54<00:00, 96.02it/s] 
+
+
+
+```python
+# Prepare the concept labels for the train images
+Y_train_concepts = np.array(list(map(lambda x: \
+                            [attributes.loc[attributes.image_id == x][\
+                            ['Attractive', 'Chubby', 'Wearing_Necktie']].values[0]],\
+                            tqdm(nm_imgs_train))))
+
+# Reshape the output labels for the train data
+Y_train_concepts = Y_train_concepts.reshape(-1, 1)
+
+# Prepare the labels for the test images
+Y_test_concepts = np.array(list(map(lambda x: \
+                            [attributes.loc[attributes.image_id == x][\
+                            ['Attractive', 'Chubby', 'Wearing_Necktie']].values[0]],\
+                            tqdm(nm_imgs_test))))
+
+# Reshape the output labels for the test data
+Y_test_concepts = Y_test_concepts.reshape(-1, 1)
+```
+
+    100%|██████████| 120000/120000 [21:14<00:00, 94.14it/s] 
+    100%|██████████| 80100/80100 [14:40<00:00, 91.01it/s] 
+
+
+##### 2.2.5 Save the models to a pickle file
+
+
+```python
+# save the input training data
+with open('X_train.pkl','wb') as f:
+    # dumpy the training image tensors
+    pickle.dump(X_train, f)
+    
+# save the input test data
+with open('X_test.pkl','wb') as f:
+    # dumpy the test image tensors
+    pickle.dump(X_test, f)
+    
+# save the output label training data
+with open('Y_train.pkl','wb') as f:
+    # dumpy the training image labels
+    pickle.dump(Y_train, f)
+    
+# save the output concept training data
+with open('Y_train_concepts.pkl','wb') as f:
+    # dumpy the training image concepts
+    pickle.dump(Y_train_concepts, f)
+    
+# save the output label test data
+with open('Y_test.pkl','wb') as f:
+    # dumpy the test image labels
+    pickle.dump(Y_test, f)
+    
+# save the output concept test data
+with open('Y_test_concepts.pkl','wb') as f:
+    # dumpy the test image concepts
+    pickle.dump(Y_test_concepts, f)
+```
+
 ##### 2.2.4 Visualize sample images
 
 
@@ -243,6 +316,10 @@ for img_index in range(1, 10):
 plt.tight_layout()
 plt.show()
 ```
+
+
+![png](output_18_0.png)
+
 
 ### 3. Helper methods for defining the CNN model
 
@@ -259,21 +336,36 @@ def base_model(inputs):
         The array storing training images are located
     Returns
     -------
-    Array
-        numpy.ndarray
+    Model, Model
+        tf.keras.Model, tf.keras.Model
     """
     try:
         # add the input layer
-        model = Input(shape=inputs)
+        images = Input(shape=inputs, name='Main-Input')
+
+         # add the first conv layer with relu activation
+        base_conv_1 = Conv2D(16, 3, padding='same', activation='relu', name='Base-Convleft1')(images)
+
+        # add a max pooling layer
+        base_conv_1 = MaxPooling2D(name='MaxPool-left1')(base_conv_1)
+
+        # add a dropout layer
+        base_conv_1 = Dropout(0.2)(base_conv_1)
+
+        # add the second conv layer with relu activation
+        base_conv_2 = Conv2D(32, 3, padding='same', activation='relu', name='Base-Convleft2')(base_conv_1)
+
+        # add a max pooling layer
+        base_conv_2 = MaxPooling2D(name='MaxPool-left2')(base_conv_2)
 
         # return the base model
-        return model
+        return images, base_conv_2
     except:
         # return empty model
-        return tf.keras.Model
+        return tf.keras.Model, tf.keras.Model
 
 # function for creating the concept model
-def concept_model(base, inputs, outputs):
+def concept_model(base, outputs):
     """
     Prepare the concept model that is attached
     to the left side of the base model
@@ -285,27 +377,12 @@ def concept_model(base, inputs, outputs):
         The number of concepts we are inferring
     Returns
     -------
-    Array
-        numpy.ndarray
+    Model
+        tf.keras.Model
     """
     try:
-        # add the first conv layer with relu activation
-        model = Conv2D(16, 3, padding='same', activation='relu', name='Base-Convleft1')(base)
-
-        # add a max pooling layer
-        model = MaxPooling2D(name='MaxPool-left1')(model)
-
-        # add a dropout layer
-        model = Dropout(0.2)(model)
-
-        # add the second conv layer with relu activation
-        model = Conv2D(32, 3, padding='same', activation='relu', name='Base-Convleft2')(model)
-
-        # add a max pooling layer
-        model = MaxPooling2D(name='MaxPool-left2')(model)
-        
         # flatten the activations in order to connect it to a fully connected layer
-        concepts = Flatten(input_shape=inputs)(model)
+        concepts = Flatten()(base)
 
         # add a fully connected layer with relu activation
         concepts = Dense(1024, activation='relu')(concepts)
@@ -314,7 +391,7 @@ def concept_model(base, inputs, outputs):
         concepts = Dense(512, activation='relu')(concepts)
 
         # add the output layer
-        concepts = Dense(outputs, activation='sigmoid', name='Concept-Activation')(concepts)
+        concepts = Dense(outputs, activation='tanh', name='Concept-Activation')(concepts)
 
         # return the combined model
         return concepts
@@ -323,7 +400,7 @@ def concept_model(base, inputs, outputs):
         return tf.keras.Model
 
 # function for creating the classification model
-def classification_model(base, inputs, outputs):
+def classification_model(base, outputs):
     """
     Prepare the classification model that is attached
     to the right side of the base model
@@ -339,23 +416,8 @@ def classification_model(base, inputs, outputs):
         numpy.ndarray
     """
     try:
-        # add the first conv layer with relu activation
-        model = Conv2D(16, 3, padding='same', activation='relu', name='Base-Conv-right1')(base)
-
-        # add a max pooling layer
-        model = MaxPooling2D(name='MaxPool-right1')(model)
-
-        # add a dropout layer
-        model = Dropout(0.2)(model)
-
-        # add the second conv layer with relu activation
-        model = Conv2D(32, 3, padding='same', activation='relu', name='Base-Convright2')(model)
-
-        # add a max pooling layer
-        model = MaxPooling2D(name='MaxPool-right2')(model)
-
         # add the third conv layer with relu activation
-        classes = Conv2D(64, 3, padding='same', activation='relu', input_shape= inputs)(model)
+        classes = Conv2D(64, 3, padding='same', activation='relu')(base)
 
         # add a max pooling layer
         classes = MaxPooling2D()(classes)
@@ -387,17 +449,17 @@ def classification_model(base, inputs, outputs):
 
 ```python
 # build the base model
-base = base_model((150, 150, 3))
+images, bridge_conv_layer = base_model((150, 150, 3))
 
 # add the left side of the network
-concepts_nn = concept_model(base, (8, 8, 32), 3)
+concepts_nn = concept_model(bridge_conv_layer, 3)
 
 # add the right side of the network
-classification_nn = classification_model(base, (8, 8, 32), 2)
+classification_nn = classification_model(bridge_conv_layer, 2)
 
 # build the model
-model = tf.keras.Model(inputs=base, \
-                       outputs=[concepts_nn, classification_nn], \
+model = tf.keras.Model(inputs=images, \
+                       outputs=[classification_nn, concepts_nn], \
                       name = 'ConcUndNN')
 
 # print the model summary
@@ -408,52 +470,42 @@ model.summary()
     __________________________________________________________________________________________________
     Layer (type)                    Output Shape         Param #     Connected to                     
     ==================================================================================================
-    input_6 (InputLayer)            [(None, 150, 150, 3) 0                                            
+    Main-Input (InputLayer)         [(None, 150, 150, 3) 0                                            
     __________________________________________________________________________________________________
-    Base-Conv-right1 (Conv2D)       (None, 150, 150, 16) 448         input_6[0][0]                    
-    __________________________________________________________________________________________________
-    MaxPool-right1 (MaxPooling2D)   (None, 75, 75, 16)   0           Base-Conv-right1[0][0]           
-    __________________________________________________________________________________________________
-    dropout_14 (Dropout)            (None, 75, 75, 16)   0           MaxPool-right1[0][0]             
-    __________________________________________________________________________________________________
-    Base-Convleft1 (Conv2D)         (None, 150, 150, 16) 448         input_6[0][0]                    
-    __________________________________________________________________________________________________
-    Base-Convright2 (Conv2D)        (None, 75, 75, 32)   4640        dropout_14[0][0]                 
+    Base-Convleft1 (Conv2D)         (None, 150, 150, 16) 448         Main-Input[0][0]                 
     __________________________________________________________________________________________________
     MaxPool-left1 (MaxPooling2D)    (None, 75, 75, 16)   0           Base-Convleft1[0][0]             
     __________________________________________________________________________________________________
-    MaxPool-right2 (MaxPooling2D)   (None, 37, 37, 32)   0           Base-Convright2[0][0]            
+    dropout_19 (Dropout)            (None, 75, 75, 16)   0           MaxPool-left1[0][0]              
     __________________________________________________________________________________________________
-    dropout_13 (Dropout)            (None, 75, 75, 16)   0           MaxPool-left1[0][0]              
-    __________________________________________________________________________________________________
-    conv2d_5 (Conv2D)               (None, 37, 37, 64)   18496       MaxPool-right2[0][0]             
-    __________________________________________________________________________________________________
-    Base-Convleft2 (Conv2D)         (None, 75, 75, 32)   4640        dropout_13[0][0]                 
-    __________________________________________________________________________________________________
-    max_pooling2d_5 (MaxPooling2D)  (None, 18, 18, 64)   0           conv2d_5[0][0]                   
+    Base-Convleft2 (Conv2D)         (None, 75, 75, 32)   4640        dropout_19[0][0]                 
     __________________________________________________________________________________________________
     MaxPool-left2 (MaxPooling2D)    (None, 37, 37, 32)   0           Base-Convleft2[0][0]             
     __________________________________________________________________________________________________
-    dropout_15 (Dropout)            (None, 18, 18, 64)   0           max_pooling2d_5[0][0]            
+    conv2d_8 (Conv2D)               (None, 37, 37, 64)   18496       MaxPool-left2[0][0]              
     __________________________________________________________________________________________________
-    flatten_10 (Flatten)            (None, 43808)        0           MaxPool-left2[0][0]              
+    max_pooling2d_7 (MaxPooling2D)  (None, 18, 18, 64)   0           conv2d_8[0][0]                   
     __________________________________________________________________________________________________
-    flatten_11 (Flatten)            (None, 20736)        0           dropout_15[0][0]                 
+    dropout_20 (Dropout)            (None, 18, 18, 64)   0           max_pooling2d_7[0][0]            
     __________________________________________________________________________________________________
-    dense_22 (Dense)                (None, 1024)         44860416    flatten_10[0][0]                 
+    flatten_16 (Flatten)            (None, 20736)        0           dropout_20[0][0]                 
     __________________________________________________________________________________________________
-    dense_24 (Dense)                (None, 1024)         21234688    flatten_11[0][0]                 
+    flatten_15 (Flatten)            (None, 43808)        0           MaxPool-left2[0][0]              
     __________________________________________________________________________________________________
-    dense_23 (Dense)                (None, 512)          524800      dense_22[0][0]                   
+    dense_32 (Dense)                (None, 1024)         21234688    flatten_16[0][0]                 
     __________________________________________________________________________________________________
-    dense_25 (Dense)                (None, 512)          524800      dense_24[0][0]                   
+    dense_30 (Dense)                (None, 1024)         44860416    flatten_15[0][0]                 
     __________________________________________________________________________________________________
-    Concept-Activation (Dense)      (None, 3)            1539        dense_23[0][0]                   
+    dense_33 (Dense)                (None, 512)          524800      dense_32[0][0]                   
     __________________________________________________________________________________________________
-    Label-Activation (Dense)        (None, 2)            1026        dense_25[0][0]                   
+    dense_31 (Dense)                (None, 512)          524800      dense_30[0][0]                   
+    __________________________________________________________________________________________________
+    Label-Activation (Dense)        (None, 2)            1026        dense_33[0][0]                   
+    __________________________________________________________________________________________________
+    Concept-Activation (Dense)      (None, 3)            1539        dense_31[0][0]                   
     ==================================================================================================
-    Total params: 67,175,941
-    Trainable params: 67,175,941
+    Total params: 67,170,853
+    Trainable params: 67,170,853
     Non-trainable params: 0
     __________________________________________________________________________________________________
 
@@ -469,7 +521,7 @@ plot_model(model, show_shapes=True, expand_nested=True)
 
 
 
-![png](output_21_0.png)
+![png](output_24_0.png)
 
 
 
@@ -484,6 +536,11 @@ rms = tf.keras.optimizers.RMSprop(lr=0.001)
 model.compile(optimizer=rms,\
               loss = {"Label-Activation": "binary_crossentropy", \
                       "Concept-Activation": "categorical_crossentropy"}, \
-              loss_weights = {"Label-Activation": 0.0, "Concept-Activation": 0.0},\
+              loss_weights = {"Label-Activation": 1.0, "Concept-Activation": 1.0},\
               metrics = ["accuracy"])
+```
+
+
+```python
+
 ```
