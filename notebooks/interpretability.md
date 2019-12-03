@@ -204,15 +204,23 @@ def get_npdata(nm_imgs_train):
     X_train = np.array(X_train)
     return(X_train)
 
-X_train = get_npdata(nm_imgs_train)
-X_test  = get_npdata(nm_imgs_test)
+def get_npdata_list_comp(nm_imgs):
+    # create the list comphrehension
+    X = [img_to_array(load_img(dir_data + "/" + myid,target_size=img_shape[:2]))/255.0\
+     for i, myid in enumerate(tqdm(nm_imgs))]
+    
+    # return the numpy array of the list
+    return np.array(X)
+
+X_train = get_npdata_list_comp(nm_imgs_train)
+X_test  = get_npdata_list_comp(nm_imgs_test)
 
 print("X_train.shape = {}".format(X_train.shape))
 print("X_test.shape = {}".format(X_test.shape))
 ```
 
-    100%|██████████| 120000/120000 [01:57<00:00, 1024.29it/s]
-    100%|██████████| 80100/80100 [01:10<00:00, 1129.61it/s]
+    100%|██████████| 120000/120000 [01:35<00:00, 1251.31it/s]
+    100%|██████████| 80100/80100 [01:00<00:00, 1331.25it/s]
 
 
     X_train.shape = (120000, 32, 32, 3)
@@ -223,50 +231,51 @@ print("X_test.shape = {}".format(X_test.shape))
 
 
 ```python
-# Prepare the labels for the train images
-Y_train = np.array(list(map(lambda x: \
-                            attributes.loc[attributes.image_id == x]['Male'].values[0],\
-                            tqdm(nm_imgs_train))))
+# create the one hot encoder instance
+onehot_encoder = OneHotEncoder(sparse=False, categories='auto')
 
-# Reshape the output labels for the train data
-Y_train = Y_train.reshape(-1, 1)
+# Prepare the labels for the train images
+Y_train = np.array([attributes.loc[attributes.image_id == x]['Male'].values[0] \
+                    for x in tqdm(nm_imgs_train)])
+
+# # reshape the training labels array
+Y_train = Y_train.reshape(len(Y_train), 1)
+
+# # one hot encode the training labels
+Y_train = onehot_encoder.fit_transform(Y_train)
 
 # Prepare the labels for the test images
-Y_test = np.array(list(map(lambda x: \
-                            attributes.loc[attributes.image_id == x]['Male'].values[0],\
-                            tqdm(nm_imgs_test))))
+Y_test = np.array([attributes.loc[attributes.image_id == x]['Male'].values[0] \
+                    for x in tqdm(nm_imgs_test)])
 
-# Reshape the output labels for the test data
-Y_test = Y_test.reshape(-1, 1)
+# reshape the test labels array
+Y_test = Y_test.reshape(len(Y_test), 1)
+
+# one hot encode the test labels
+Y_test = onehot_encoder.fit_transform(Y_test)
 ```
 
-    100%|██████████| 120000/120000 [20:33<00:00, 97.28it/s] 
-    100%|██████████| 80100/80100 [13:54<00:00, 96.02it/s] 
+    100%|██████████| 120000/120000 [19:38<00:00, 101.84it/s]
+    100%|██████████| 80100/80100 [12:50<00:00, 103.94it/s]
 
+
+##### 2.2.4 Prepare the output labels for the concepts
 
 
 ```python
 # Prepare the concept labels for the train images
-Y_train_concepts = np.array(list(map(lambda x: \
-                            [attributes.loc[attributes.image_id == x][\
-                            ['Attractive', 'Chubby', 'Wearing_Necktie']].values[0]],\
-                            tqdm(nm_imgs_train))))
-
-# Reshape the output labels for the train data
-Y_train_concepts = Y_train_concepts.reshape(-1, 1)
+Y_train_concepts = np.array([attributes.loc[attributes.image_id == x][\
+                            ['Attractive', 'Chubby', 'Wearing_Necktie']].values[0] \
+                            for x in tqdm(nm_imgs_train)])
 
 # Prepare the labels for the test images
-Y_test_concepts = np.array(list(map(lambda x: \
-                            [attributes.loc[attributes.image_id == x][\
-                            ['Attractive', 'Chubby', 'Wearing_Necktie']].values[0]],\
-                            tqdm(nm_imgs_test))))
-
-# Reshape the output labels for the test data
-Y_test_concepts = Y_test_concepts.reshape(-1, 1)
+Y_test_concepts = np.array([attributes.loc[attributes.image_id == x][\
+                            ['Attractive', 'Chubby', 'Wearing_Necktie']].values[0] \
+                            for x in tqdm(nm_imgs_test)])
 ```
 
-    100%|██████████| 120000/120000 [21:14<00:00, 94.14it/s] 
-    100%|██████████| 80100/80100 [14:40<00:00, 91.01it/s] 
+    100%|██████████| 120000/120000 [22:16<00:00, 89.81it/s] 
+    100%|██████████| 80100/80100 [14:31<00:00, 91.95it/s] 
 
 
 ##### 2.2.5 Save the models to a pickle file
@@ -304,7 +313,42 @@ with open('Y_test_concepts.pkl','wb') as f:
     pickle.dump(Y_test_concepts, f)
 ```
 
-##### 2.2.4 Visualize sample images
+##### 2.2.6 Load the picked files
+
+
+```python
+# save the input training data
+with open('X_train.pkl','rb') as f:
+    # load the training image tensors
+    X_train = pickle.load(f)
+    
+# save the input test data
+with open('X_test.pkl','rb') as f:
+    # load the test image tensors
+    X_test = pickle.load(f)
+    
+# save the output label training data
+with open('Y_train.pkl','rb') as f:
+    # load the training image labels
+    Y_train = pickle.load(f)
+    
+# save the output concept training data
+with open('Y_train_concepts.pkl','rb') as f:
+    # load the training image concepts
+    Y_train_concepts = pickle.load(f)
+    
+# save the output label test data
+with open('Y_test.pkl','rb') as f:
+    # load the test image labels
+    Y_test = pickle.load(f)
+    
+# save the output concept test data
+with open('Y_test_concepts.pkl','rb') as f:
+    # load the test image concepts
+    Y_test_concepts = pickle.load(f)
+```
+
+##### 2.2.7 Visualize sample images
 
 
 ```python
@@ -318,7 +362,7 @@ plt.show()
 ```
 
 
-![png](output_18_0.png)
+![png](output_21_0.png)
 
 
 ### 3. Helper methods for defining the CNN model
@@ -449,7 +493,7 @@ def classification_model(base, outputs):
 
 ```python
 # build the base model
-images, bridge_conv_layer = base_model((150, 150, 3))
+images, bridge_conv_layer = base_model((32, 32, 3))
 
 # add the left side of the network
 concepts_nn = concept_model(bridge_conv_layer, 3)
@@ -460,52 +504,52 @@ classification_nn = classification_model(bridge_conv_layer, 2)
 # build the model
 model = tf.keras.Model(inputs=images, \
                        outputs=[classification_nn, concepts_nn], \
-                      name = 'ConcUndNN')
+                      name = 'conceptNet')
 
 # print the model summary
 model.summary()
 ```
 
-    Model: "ConcUndNN"
+    Model: "conceptNet"
     __________________________________________________________________________________________________
     Layer (type)                    Output Shape         Param #     Connected to                     
     ==================================================================================================
-    Main-Input (InputLayer)         [(None, 150, 150, 3) 0                                            
+    Main-Input (InputLayer)         [(None, 32, 32, 3)]  0                                            
     __________________________________________________________________________________________________
-    Base-Convleft1 (Conv2D)         (None, 150, 150, 16) 448         Main-Input[0][0]                 
+    Base-Convleft1 (Conv2D)         (None, 32, 32, 16)   448         Main-Input[0][0]                 
     __________________________________________________________________________________________________
-    MaxPool-left1 (MaxPooling2D)    (None, 75, 75, 16)   0           Base-Convleft1[0][0]             
+    MaxPool-left1 (MaxPooling2D)    (None, 16, 16, 16)   0           Base-Convleft1[0][0]             
     __________________________________________________________________________________________________
-    dropout_19 (Dropout)            (None, 75, 75, 16)   0           MaxPool-left1[0][0]              
+    dropout_4 (Dropout)             (None, 16, 16, 16)   0           MaxPool-left1[0][0]              
     __________________________________________________________________________________________________
-    Base-Convleft2 (Conv2D)         (None, 75, 75, 32)   4640        dropout_19[0][0]                 
+    Base-Convleft2 (Conv2D)         (None, 16, 16, 32)   4640        dropout_4[0][0]                  
     __________________________________________________________________________________________________
-    MaxPool-left2 (MaxPooling2D)    (None, 37, 37, 32)   0           Base-Convleft2[0][0]             
+    MaxPool-left2 (MaxPooling2D)    (None, 8, 8, 32)     0           Base-Convleft2[0][0]             
     __________________________________________________________________________________________________
-    conv2d_8 (Conv2D)               (None, 37, 37, 64)   18496       MaxPool-left2[0][0]              
+    conv2d_2 (Conv2D)               (None, 8, 8, 64)     18496       MaxPool-left2[0][0]              
     __________________________________________________________________________________________________
-    max_pooling2d_7 (MaxPooling2D)  (None, 18, 18, 64)   0           conv2d_8[0][0]                   
+    max_pooling2d_2 (MaxPooling2D)  (None, 4, 4, 64)     0           conv2d_2[0][0]                   
     __________________________________________________________________________________________________
-    dropout_20 (Dropout)            (None, 18, 18, 64)   0           max_pooling2d_7[0][0]            
+    dropout_5 (Dropout)             (None, 4, 4, 64)     0           max_pooling2d_2[0][0]            
     __________________________________________________________________________________________________
-    flatten_16 (Flatten)            (None, 20736)        0           dropout_20[0][0]                 
+    flatten_5 (Flatten)             (None, 1024)         0           dropout_5[0][0]                  
     __________________________________________________________________________________________________
-    flatten_15 (Flatten)            (None, 43808)        0           MaxPool-left2[0][0]              
+    flatten_4 (Flatten)             (None, 2048)         0           MaxPool-left2[0][0]              
     __________________________________________________________________________________________________
-    dense_32 (Dense)                (None, 1024)         21234688    flatten_16[0][0]                 
+    dense_10 (Dense)                (None, 1024)         1049600     flatten_5[0][0]                  
     __________________________________________________________________________________________________
-    dense_30 (Dense)                (None, 1024)         44860416    flatten_15[0][0]                 
+    dense_8 (Dense)                 (None, 1024)         2098176     flatten_4[0][0]                  
     __________________________________________________________________________________________________
-    dense_33 (Dense)                (None, 512)          524800      dense_32[0][0]                   
+    dense_11 (Dense)                (None, 512)          524800      dense_10[0][0]                   
     __________________________________________________________________________________________________
-    dense_31 (Dense)                (None, 512)          524800      dense_30[0][0]                   
+    dense_9 (Dense)                 (None, 512)          524800      dense_8[0][0]                    
     __________________________________________________________________________________________________
-    Label-Activation (Dense)        (None, 2)            1026        dense_33[0][0]                   
+    Label-Activation (Dense)        (None, 2)            1026        dense_11[0][0]                   
     __________________________________________________________________________________________________
-    Concept-Activation (Dense)      (None, 3)            1539        dense_31[0][0]                   
+    Concept-Activation (Dense)      (None, 3)            1539        dense_9[0][0]                    
     ==================================================================================================
-    Total params: 67,170,853
-    Trainable params: 67,170,853
+    Total params: 4,223,525
+    Trainable params: 4,223,525
     Non-trainable params: 0
     __________________________________________________________________________________________________
 
@@ -521,7 +565,7 @@ plot_model(model, show_shapes=True, expand_nested=True)
 
 
 
-![png](output_24_0.png)
+![png](output_27_0.png)
 
 
 
@@ -539,6 +583,138 @@ model.compile(optimizer=rms,\
               loss_weights = {"Label-Activation": 1.0, "Concept-Activation": 1.0},\
               metrics = ["accuracy"])
 ```
+
+#### 3.5 Train the model
+
+
+```python
+model.fit(X_train, \
+          {"Label-Activation": Y_train,\
+           "Concept-Activation": Y_train_concepts},
+         validation_data=(X_test, {"Label-Activation": Y_test,\
+           "Concept-Activation": Y_test_concepts}),
+         epochs=10)
+```
+
+    WARNING: Logging before flag parsing goes to stderr.
+    W1203 04:13:42.577451 139638514427648 deprecation.py:323] From /home/hector/.pyenv/versions/3.6.5/envs/jupyter/lib/python3.6/site-packages/tensorflow/python/ops/math_grad.py:1250: add_dispatch_support.<locals>.wrapper (from tensorflow.python.ops.array_ops) is deprecated and will be removed in a future version.
+    Instructions for updating:
+    Use tf.where in 2.0, which has the same broadcast rule as np.where
+
+
+    Train on 120000 samples, validate on 80100 samples
+    Epoch 1/10
+    120000/120000 [==============================] - 185s 2ms/sample - loss: -0.6239 - Label-Activation_loss: 0.2916 - Concept-Activation_loss: -0.9155 - Label-Activation_accuracy: 0.8730 - Concept-Activation_accuracy: 0.8258 - val_loss: 0.5541 - val_Label-Activation_loss: 0.1765 - val_Concept-Activation_loss: 0.3774 - val_Label-Activation_accuracy: 0.9273 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 2/10
+    120000/120000 [==============================] - 186s 2ms/sample - loss: 0.6399 - Label-Activation_loss: 0.2101 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9162 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5417 - val_Label-Activation_loss: 0.1643 - val_Concept-Activation_loss: 0.3774 - val_Label-Activation_accuracy: 0.9345 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 3/10
+    120000/120000 [==============================] - 189s 2ms/sample - loss: 0.6245 - Label-Activation_loss: 0.1947 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9238 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5377 - val_Label-Activation_loss: 0.1602 - val_Concept-Activation_loss: 0.3802 - val_Label-Activation_accuracy: 0.9359 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 4/10
+    120000/120000 [==============================] - 188s 2ms/sample - loss: 0.6254 - Label-Activation_loss: 0.1956 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9247 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5312 - val_Label-Activation_loss: 0.1537 - val_Concept-Activation_loss: 0.3746 - val_Label-Activation_accuracy: 0.9442 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 5/10
+    120000/120000 [==============================] - 189s 2ms/sample - loss: 0.6253 - Label-Activation_loss: 0.1955 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9246 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5340 - val_Label-Activation_loss: 0.1564 - val_Concept-Activation_loss: 0.3802 - val_Label-Activation_accuracy: 0.9407 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 6/10
+    120000/120000 [==============================] - 188s 2ms/sample - loss: 0.6280 - Label-Activation_loss: 0.1982 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9235 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5335 - val_Label-Activation_loss: 0.1560 - val_Concept-Activation_loss: 0.3745 - val_Label-Activation_accuracy: 0.9421 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 7/10
+    120000/120000 [==============================] - 187s 2ms/sample - loss: 0.6314 - Label-Activation_loss: 0.2016 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9237 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5642 - val_Label-Activation_loss: 0.1867 - val_Concept-Activation_loss: 0.3746 - val_Label-Activation_accuracy: 0.9369 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 8/10
+    120000/120000 [==============================] - 178s 1ms/sample - loss: 0.6377 - Label-Activation_loss: 0.2078 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9216 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5202 - val_Label-Activation_loss: 0.1427 - val_Concept-Activation_loss: 0.3774 - val_Label-Activation_accuracy: 0.9439 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 9/10
+    120000/120000 [==============================] - 186s 2ms/sample - loss: 0.6374 - Label-Activation_loss: 0.2076 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9207 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5246 - val_Label-Activation_loss: 0.1472 - val_Concept-Activation_loss: 0.3717 - val_Label-Activation_accuracy: 0.9448 - val_Concept-Activation_accuracy: 0.9047
+    Epoch 10/10
+    120000/120000 [==============================] - 189s 2ms/sample - loss: 0.6412 - Label-Activation_loss: 0.2114 - Concept-Activation_loss: 0.4298 - Label-Activation_accuracy: 0.9210 - Concept-Activation_accuracy: 0.9042 - val_loss: 0.5331 - val_Label-Activation_loss: 0.1557 - val_Concept-Activation_loss: 0.3746 - val_Label-Activation_accuracy: 0.9406 - val_Concept-Activation_accuracy: 0.9047
+
+
+
+
+
+    <tensorflow.python.keras.callbacks.History at 0x7efff99bce10>
+
+
+
+
+```python
+sns.set_style('white')
+plt.figure(num=None, figsize=(12, 10), dpi=80, facecolor='w', edgecolor='k')
+plt.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=True)
+plt.box(True)
+
+# Plot training & validation accuracy values
+plt.plot(model.history.history['Label-Activation_loss'])
+plt.plot(model.history.history['val_Label-Activation_loss'])
+plt.title('Plotting the label activation loss for the model')
+plt.ylabel('Loss (binary_crossentropy)')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper right')
+plt.show()
+```
+
+
+![png](output_32_0.png)
+
+
+
+```python
+sns.set_style('white')
+plt.figure(num=None, figsize=(12, 10), dpi=80, facecolor='w', edgecolor='k')
+plt.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=True)
+plt.box(True)
+
+# Plot training & validation accuracy values
+plt.plot(model.history.history['Concept-Activation_loss'])
+plt.plot(model.history.history['val_Concept-Activation_loss'])
+plt.title('Plotting the conceppt activation loss for the model')
+plt.ylabel('Loss (categorical_crossentropy)')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper right')
+plt.show()
+```
+
+
+![png](output_33_0.png)
+
+
+
+```python
+sns.set_style('white')
+plt.figure(num=None, figsize=(12, 10), dpi=80, facecolor='w', edgecolor='k')
+plt.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=True)
+plt.box(True)
+
+# Plot training & validation accuracy values
+plt.plot(model.history.history['Label-Activation_accuracy'])
+plt.plot(model.history.history['val_Label-Activation_accuracy'])
+plt.title('Plotting the label activation accuracy for the model')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper right')
+plt.show()
+```
+
+
+![png](output_34_0.png)
+
+
+
+```python
+sns.set_style('white')
+plt.figure(num=None, figsize=(12, 10), dpi=80, facecolor='w', edgecolor='k')
+plt.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=True)
+plt.box(True)
+
+# Plot training & validation accuracy values
+plt.plot(model.history.history['Concept-Activation_accuracy'])
+plt.plot(model.history.history['val_Concept-Activation_accuracy'])
+plt.title('Plotting the conceppt activation accuracy for the model')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper right')
+plt.show()
+```
+
+
+![png](output_35_0.png)
+
 
 
 ```python
