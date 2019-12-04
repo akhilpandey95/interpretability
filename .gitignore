@@ -1,0 +1,24 @@
+# emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# DS store
+*/.DS_Store
+.DS_Store
+.DS_Store?
+._*
+
+# csv files
+*.csv
+src/*.csv
+
+# python files
+*.pyc
+src/*.pyc
+src/__pycache__
